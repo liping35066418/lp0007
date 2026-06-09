@@ -1,21 +1,40 @@
 const API_BASE = 'http://127.0.0.1:9607/api';
 
+const DIFFICULTY_NAMES = {
+  easy: '简单',
+  normal: '普通',
+  hard: '困难'
+};
+
 const state = {
+  difficulty: 'normal',
+  difficultyName: '普通',
   minRange: 1,
   maxRange: 100,
   attempts: 0,
   isFinished: false,
-  history: []
+  history: [],
+  bestScores: {
+    easy: null,
+    normal: null,
+    hard: null
+  }
 };
 
 const elements = {
   rangeDisplay: document.getElementById('rangeDisplay'),
   attemptsDisplay: document.getElementById('attemptsDisplay'),
+  bestScoreDisplay: document.getElementById('bestScoreDisplay'),
+  difficultyDisplay: document.getElementById('difficultyDisplay'),
   resultDisplay: document.getElementById('resultDisplay'),
   guessInput: document.getElementById('guessInput'),
   guessBtn: document.getElementById('guessBtn'),
   resetBtn: document.getElementById('resetBtn'),
-  historyList: document.getElementById('historyList')
+  historyList: document.getElementById('historyList'),
+  recordModal: document.getElementById('recordModal'),
+  modalText: document.getElementById('modalText'),
+  modalCloseBtn: document.getElementById('modalCloseBtn'),
+  diffBtns: document.querySelectorAll('.diff-btn')
 };
 
 async function request(url, options = {}) {
@@ -39,10 +58,16 @@ async function request(url, options = {}) {
 async function loadGameInfo() {
   const data = await request(`${API_BASE}/game/info`);
   if (data.success !== false) {
+    state.difficulty = data.difficulty;
+    state.difficultyName = data.difficultyName;
     state.minRange = data.minRange;
     state.maxRange = data.maxRange;
     state.attempts = data.attempts;
     state.isFinished = data.isFinished;
+    if (data.bestScores) {
+      state.bestScores = data.bestScores;
+    }
+    updateDifficultyButtons();
     updateDisplay();
   }
 }
@@ -113,6 +138,15 @@ async function submitGuess() {
 
     elements.guessInput.value = '';
 
+    if (data.bestScore !== undefined) {
+      state.bestScores[state.difficulty] = data.bestScore;
+      updateDisplay();
+    }
+
+    if (data.isNewRecord) {
+      showRecordModal(data.attempts);
+    }
+
     if (state.isFinished) {
       elements.guessInput.disabled = true;
     }
@@ -139,15 +173,22 @@ async function resetGame() {
       return;
     }
 
+    state.difficulty = data.difficulty;
+    state.difficultyName = data.difficultyName;
     state.minRange = data.minRange;
     state.maxRange = data.maxRange;
     state.attempts = 0;
     state.isFinished = false;
     state.history = [];
 
+    if (data.bestScore !== undefined) {
+      state.bestScores[state.difficulty] = data.bestScore;
+    }
+
     elements.guessInput.disabled = false;
 
     clearResult();
+    updateDifficultyButtons();
     updateDisplay();
     renderHistory();
     elements.guessInput.focus();
@@ -155,6 +196,49 @@ async function resetGame() {
     setLoading(false);
     console.error('resetGame error:', err);
     showResult('重置出错，请重试', '提示');
+  }
+}
+
+async function changeDifficulty(difficulty) {
+  try {
+    setLoading(true);
+
+    const data = await request(`${API_BASE}/game/difficulty`, {
+      method: 'POST',
+      body: JSON.stringify({ difficulty })
+    });
+
+    setLoading(false);
+
+    if (!data.success) {
+      showResult(data.message, '提示');
+      return;
+    }
+
+    state.difficulty = data.difficulty;
+    state.difficultyName = data.difficultyName;
+    state.minRange = data.minRange;
+    state.maxRange = data.maxRange;
+    state.attempts = 0;
+    state.isFinished = false;
+    state.history = [];
+
+    if (data.bestScores) {
+      state.bestScores = data.bestScores;
+    }
+
+    elements.guessInput.disabled = false;
+
+    updateDifficultyButtons();
+    clearResult();
+    showResult(data.message, '提示');
+    updateDisplay();
+    renderHistory();
+    elements.guessInput.focus();
+  } catch (err) {
+    setLoading(false);
+    console.error('changeDifficulty error:', err);
+    showResult('切换难度出错，请重试', '提示');
   }
 }
 
@@ -237,25 +321,65 @@ function renderHistory() {
   }).join('');
 }
 
+function updateDifficultyButtons() {
+  elements.diffBtns.forEach(btn => {
+    const diff = btn.getAttribute('data-difficulty');
+    btn.classList.remove('active');
+    if (diff === state.difficulty) {
+      btn.classList.add('active');
+    }
+  });
+}
+
 function updateDisplay() {
   elements.rangeDisplay.textContent = `${state.minRange} - ${state.maxRange}`;
   elements.attemptsDisplay.textContent = state.attempts;
+  elements.difficultyDisplay.textContent = state.difficultyName;
+
+  const best = state.bestScores[state.difficulty];
+  elements.bestScoreDisplay.textContent = best !== null ? `${best}次` : '--';
 }
 
 function setLoading(loading) {
   if (loading) {
     elements.guessBtn.disabled = true;
     elements.resetBtn.disabled = true;
+    elements.diffBtns.forEach(btn => btn.disabled = true);
     elements.guessBtn.textContent = '提交中...';
   } else {
     elements.guessBtn.disabled = state.isFinished;
     elements.resetBtn.disabled = false;
+    elements.diffBtns.forEach(btn => btn.disabled = false);
     elements.guessBtn.textContent = '猜一下';
   }
 }
 
+function showRecordModal(attempts) {
+  elements.modalText.textContent = `恭喜！你在${state.difficultyName}难度下仅用 ${attempts} 次就猜中了答案，创造了新纪录！`;
+  elements.recordModal.classList.add('show');
+}
+
+function hideRecordModal() {
+  elements.recordModal.classList.remove('show');
+}
+
 elements.guessBtn.addEventListener('click', submitGuess);
 elements.resetBtn.addEventListener('click', resetGame);
+elements.modalCloseBtn.addEventListener('click', hideRecordModal);
+elements.recordModal.addEventListener('click', (e) => {
+  if (e.target === elements.recordModal) {
+    hideRecordModal();
+  }
+});
+
+elements.diffBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const diff = btn.getAttribute('data-difficulty');
+    if (diff !== state.difficulty) {
+      changeDifficulty(diff);
+    }
+  });
+});
 
 elements.guessInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !state.isFinished) {

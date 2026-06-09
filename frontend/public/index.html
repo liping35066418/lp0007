@@ -16,6 +16,15 @@
     </header>
 
     <main class="main">
+      <div class="difficulty-area">
+        <span class="difficulty-label">难度选择</span>
+        <div class="difficulty-buttons">
+          <button class="diff-btn" data-difficulty="easy">简单</button>
+          <button class="diff-btn" data-difficulty="normal">普通</button>
+          <button class="diff-btn" data-difficulty="hard">困难</button>
+        </div>
+      </div>
+
       <div class="game-info">
         <div class="info-card">
           <span class="info-label">数值范围</span>
@@ -24,6 +33,14 @@
         <div class="info-card">
           <span class="info-label">猜测次数</span>
           <span class="info-value" id="attemptsDisplay">0</span>
+        </div>
+        <div class="info-card">
+          <span class="info-label">最佳成绩</span>
+          <span class="info-value" id="bestScoreDisplay">--</span>
+        </div>
+        <div class="info-card">
+          <span class="info-label">当前难度</span>
+          <span class="info-value" id="difficultyDisplay">普通</span>
         </div>
       </div>
 
@@ -60,6 +77,15 @@
     <footer class="footer">
       <p>© 2026 猜数字小游戏 | 轻松一刻</p>
     </footer>
+  </div>
+
+  <div class="modal" id="recordModal">
+    <div class="modal-content">
+      <div class="modal-emoji">🏆</div>
+      <h2 class="modal-title">新纪录！</h2>
+      <p class="modal-text" id="modalText">恭喜你创造了新的最佳成绩！</p>
+      <button class="btn btn-primary modal-btn" id="modalCloseBtn">太棒了</button>
+    </div>
   </div>
 
   <script src="app.js"></script>

@@ -1,32 +1,70 @@
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 
 const PORT = 9607;
 const HOST = '127.0.0.1';
 const ALLOWED_ORIGIN = `http://${HOST}:3607`;
+const BEST_SCORES_FILE = path.join(__dirname, 'best_scores.json');
 
-let gameState = {
-  answer: null,
-  minRange: 1,
-  maxRange: 100,
-  attempts: 0,
-  isFinished: false
+const DIFFICULTY_CONFIG = {
+  easy: { name: '简单', min: 1, max: 50 },
+  normal: { name: '普通', min: 1, max: 100 },
+  hard: { name: '困难', min: 1, max: 500 }
 };
+
+let currentDifficulty = 'normal';
+
+let gameStates = {};
+
+let bestScores = loadBestScores();
+
+function loadBestScores() {
+  try {
+    if (fs.existsSync(BEST_SCORES_FILE)) {
+      const data = fs.readFileSync(BEST_SCORES_FILE, 'utf-8');
+      const parsed = JSON.parse(data);
+      return {
+        easy: parsed.easy || null,
+        normal: parsed.normal || null,
+        hard: parsed.hard || null
+      };
+    }
+  } catch (e) {
+    console.error('加载最佳成绩失败:', e.message);
+  }
+  return { easy: null, normal: null, hard: null };
+}
+
+function saveBestScores() {
+  try {
+    fs.writeFileSync(BEST_SCORES_FILE, JSON.stringify(bestScores, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('保存最佳成绩失败:', e.message);
+  }
+}
 
 function generateAnswer(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function initGame(min = 1, max = 100) {
-  gameState = {
-    answer: generateAnswer(min, max),
-    minRange: min,
-    maxRange: max,
+function initGame(difficulty) {
+  const config = DIFFICULTY_CONFIG[difficulty];
+  gameStates[difficulty] = {
+    answer: generateAnswer(config.min, config.max),
+    minRange: config.min,
+    maxRange: config.max,
     attempts: 0,
     isFinished: false
   };
 }
 
-initGame();
+function getCurrentGameState() {
+  if (!gameStates[currentDifficulty]) {
+    initGame(currentDifficulty);
+  }
+  return gameStates[currentDifficulty];
+}
 
 function sendJSON(res, statusCode, data) {
   const body = JSON.stringify(data);
@@ -84,18 +122,62 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (method === 'GET' && url === '/api/game/info') {
+    const gameState = getCurrentGameState();
+    const config = DIFFICULTY_CONFIG[currentDifficulty];
     sendJSON(res, 200, {
+      difficulty: currentDifficulty,
+      difficultyName: config.name,
       minRange: gameState.minRange,
       maxRange: gameState.maxRange,
       attempts: gameState.attempts,
       isFinished: gameState.isFinished,
-      answer: gameState.isFinished ? gameState.answer : null
+      answer: gameState.isFinished ? gameState.answer : null,
+      bestScores: bestScores,
+      difficultyConfig: DIFFICULTY_CONFIG
     });
+    return;
+  }
+
+  if (method === 'POST' && url === '/api/game/difficulty') {
+    try {
+      const body = await parseBody(req);
+      const { difficulty } = body;
+
+      if (!DIFFICULTY_CONFIG[difficulty]) {
+        sendJSON(res, 400, {
+          success: false,
+          message: '无效的难度级别'
+        });
+        return;
+      }
+
+      currentDifficulty = difficulty;
+      initGame(difficulty);
+
+      const gameState = getCurrentGameState();
+      const config = DIFFICULTY_CONFIG[difficulty];
+
+      sendJSON(res, 200, {
+        success: true,
+        message: `已切换到${config.name}难度（${config.min}-${config.max}），新游戏已开始`,
+        difficulty: currentDifficulty,
+        difficultyName: config.name,
+        minRange: gameState.minRange,
+        maxRange: gameState.maxRange,
+        bestScores: bestScores
+      });
+    } catch (err) {
+      sendJSON(res, 400, {
+        success: false,
+        message: err.message || '请求处理失败'
+      });
+    }
     return;
   }
 
   if (method === 'POST' && url === '/api/game/guess') {
     try {
+      const gameState = getCurrentGameState();
       const body = await parseBody(req);
       const { guess } = body;
 
@@ -197,11 +279,21 @@ const server = http.createServer(async (req, res) => {
 
       let result;
       let message;
+      let isNewRecord = false;
 
       if (guessNum === gameState.answer) {
         gameState.isFinished = true;
         result = 'correct';
-        message = `猜对答案！答案是 ${gameState.answer}，共猜了 ${gameState.attempts} 次`;
+
+        const currentBest = bestScores[currentDifficulty];
+        if (currentBest === null || gameState.attempts < currentBest) {
+          bestScores[currentDifficulty] = gameState.attempts;
+          saveBestScores();
+          isNewRecord = true;
+        }
+
+        const recordText = isNewRecord ? ' 🏆新纪录！' : '';
+        message = `猜对答案！答案是 ${gameState.answer}，共猜了 ${gameState.attempts} 次${recordText}`;
       } else if (guessNum > gameState.answer) {
         result = 'too_high';
         message = '数字偏大';
@@ -216,7 +308,9 @@ const server = http.createServer(async (req, res) => {
         message,
         attempts: gameState.attempts,
         isFinished: gameState.isFinished,
-        answer: gameState.isFinished ? gameState.answer : null
+        answer: gameState.isFinished ? gameState.answer : null,
+        isNewRecord,
+        bestScore: bestScores[currentDifficulty]
       });
     } catch (err) {
       sendJSON(res, 400, {
@@ -229,26 +323,17 @@ const server = http.createServer(async (req, res) => {
 
   if (method === 'POST' && url === '/api/game/reset') {
     try {
-      const body = await parseBody(req);
-      const { min, max } = body || {};
-      const newMin = min ? parseInt(min, 10) : 1;
-      const newMax = max ? parseInt(max, 10) : 100;
-
-      if (isNaN(newMin) || isNaN(newMax) || newMin >= newMax) {
-        sendJSON(res, 400, {
-          success: false,
-          message: '无效的数值范围'
-        });
-        return;
-      }
-
-      initGame(newMin, newMax);
+      initGame(currentDifficulty);
+      const gameState = getCurrentGameState();
 
       sendJSON(res, 200, {
         success: true,
         message: '新游戏已开始',
+        difficulty: currentDifficulty,
+        difficultyName: DIFFICULTY_CONFIG[currentDifficulty].name,
         minRange: gameState.minRange,
-        maxRange: gameState.maxRange
+        maxRange: gameState.maxRange,
+        bestScore: bestScores[currentDifficulty]
       });
     } catch (err) {
       sendJSON(res, 400, {
@@ -267,4 +352,6 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, HOST, () => {
   console.log(`猜数字游戏后端服务已启动: http://${HOST}:${PORT}`);
+  console.log(`难度配置: 简单(1-50) 普通(1-100) 困难(1-500)`);
+  console.log(`最佳成绩存储: ${BEST_SCORES_FILE}`);
 });
