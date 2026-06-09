@@ -48,81 +48,114 @@ async function loadGameInfo() {
 }
 
 async function submitGuess() {
-  const guess = elements.guessInput.value.trim();
+  try {
+    const rawValue = elements.guessInput.value;
 
-  if (!guess) {
-    showResult('请输入数字', '提示');
-    return;
-  }
+    if (!rawValue) {
+      showResult('请输入一个数字再开始猜哦', '提示');
+      return;
+    }
 
-  const guessNum = parseInt(guess, 10);
-  if (isNaN(guessNum)) {
-    showResult('请输入有效的数字', '提示');
-    return;
-  }
+    if (/\s/.test(rawValue)) {
+      showResult('输入不能包含空格，请输入纯数字', '提示');
+      return;
+    }
 
-  if (guessNum < state.minRange || guessNum > state.maxRange) {
-    showResult(`请输入 ${state.minRange} 到 ${state.maxRange} 之间的数字`, '提示');
-    return;
-  }
+    const guess = rawValue;
 
-  setLoading(true);
+    if (guess.includes('-')) {
+      showResult('请输入正整数，不能是负数', '提示');
+      return;
+    }
 
-  const data = await request(`${API_BASE}/game/guess`, {
-    method: 'POST',
-    body: JSON.stringify({ guess: guessNum })
-  });
+    if (guess.includes('.')) {
+      showResult('请输入整数，不支持小数', '提示');
+      return;
+    }
 
-  setLoading(false);
+    if (!/^\d+$/.test(guess)) {
+      showResult('请输入有效的正整数，不能含字母或特殊字符', '提示');
+      return;
+    }
 
-  if (!data.success) {
-    showResult(data.message, '提示');
-    return;
-  }
+    const guessNum = Number(guess);
 
-  state.attempts = data.attempts;
-  state.isFinished = data.isFinished;
+    if (!Number.isFinite(guessNum) || !Number.isSafeInteger(guessNum)) {
+      showResult('数字太大啦，请输入较小的整数', '提示');
+      return;
+    }
 
-  addHistory(guessNum, data.result);
-  showResult(data.message, data.result);
-  updateDisplay();
+    if (guessNum < state.minRange || guessNum > state.maxRange) {
+      showResult(`请输入 ${state.minRange} 到 ${state.maxRange} 之间的整数`, '提示');
+      return;
+    }
 
-  elements.guessInput.value = '';
+    setLoading(true);
 
-  if (state.isFinished) {
-    elements.guessInput.disabled = true;
+    const data = await request(`${API_BASE}/game/guess`, {
+      method: 'POST',
+      body: JSON.stringify({ guess: guessNum })
+    });
+
+    setLoading(false);
+
+    if (!data.success) {
+      showResult(data.message, '提示');
+      return;
+    }
+
+    state.attempts = data.attempts;
+    state.isFinished = data.isFinished;
+
+    addHistory(guessNum, data.result);
+    showResult(data.message, data.result);
+    updateDisplay();
+
+    elements.guessInput.value = '';
+
+    if (state.isFinished) {
+      elements.guessInput.disabled = true;
+    }
+  } catch (err) {
+    setLoading(false);
+    console.error('submitGuess error:', err);
+    showResult('处理出错，请重试', '提示');
   }
 }
 
 async function resetGame() {
-  setLoading(true);
+  try {
+    setLoading(true);
 
-  const data = await request(`${API_BASE}/game/reset`, {
-    method: 'POST',
-    body: JSON.stringify({})
-  });
+    const data = await request(`${API_BASE}/game/reset`, {
+      method: 'POST',
+      body: JSON.stringify({})
+    });
 
-  setLoading(false);
+    setLoading(false);
 
-  if (!data.success) {
-    showResult(data.message, '提示');
-    return;
+    if (!data.success) {
+      showResult(data.message, '提示');
+      return;
+    }
+
+    state.minRange = data.minRange;
+    state.maxRange = data.maxRange;
+    state.attempts = 0;
+    state.isFinished = false;
+    state.history = [];
+
+    elements.guessInput.disabled = false;
+
+    clearResult();
+    updateDisplay();
+    renderHistory();
+    elements.guessInput.focus();
+  } catch (err) {
+    setLoading(false);
+    console.error('resetGame error:', err);
+    showResult('重置出错，请重试', '提示');
   }
-
-  state.minRange = data.minRange;
-  state.maxRange = data.maxRange;
-  state.attempts = 0;
-  state.isFinished = false;
-  state.history = [];
-
-  elements.guessInput.disabled = false;
-  elements.guessInput.min = state.minRange;
-  elements.guessInput.max = state.maxRange;
-
-  clearResult();
-  updateDisplay();
-  renderHistory();
-  elements.guessInput.focus();
 }
 
 function showResult(message, type) {
@@ -148,7 +181,9 @@ function showResult(message, type) {
       emoji = '💡';
   }
 
-  elements.resultDisplay.classList.add(resultClass);
+  if (resultClass) {
+    elements.resultDisplay.classList.add(resultClass);
+  }
   elements.resultDisplay.innerHTML = `
     <div>
       <span class="result-emoji">${emoji}</span>

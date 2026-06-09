@@ -34,12 +34,12 @@
 
         <div class="input-area">
           <input
-            type="number"
+            type="text"
+            inputmode="numeric"
+            pattern="[0-9]*"
             id="guessInput"
             class="guess-input"
             placeholder="请输入你猜的数字"
-            min="1"
-            max="100"
             autocomplete="off"
           >
           <button id="guessBtn" class="btn btn-primary">猜一下</button>

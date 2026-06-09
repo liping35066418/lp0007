@@ -107,12 +107,80 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      const guessNum = parseInt(guess, 10);
+      let guessNum;
 
-      if (isNaN(guessNum)) {
+      if (typeof guess === 'number') {
+        if (!Number.isFinite(guess)) {
+          sendJSON(res, 400, {
+            success: false,
+            message: '请输入有效的整数'
+          });
+          return;
+        }
+        if (!Number.isInteger(guess)) {
+          sendJSON(res, 400, {
+            success: false,
+            message: '请输入整数，不支持小数'
+          });
+          return;
+        }
+        if (guess < 0) {
+          sendJSON(res, 400, {
+            success: false,
+            message: '请输入正整数，不能是负数'
+          });
+          return;
+        }
+        guessNum = guess;
+      } else if (typeof guess === 'string') {
+        if (!guess) {
+          sendJSON(res, 400, {
+            success: false,
+            message: '请输入一个数字再开始猜哦'
+          });
+          return;
+        }
+        if (/\s/.test(guess)) {
+          sendJSON(res, 400, {
+            success: false,
+            message: '输入不能包含空格，请输入纯数字'
+          });
+          return;
+        }
+        if (guess.includes('-')) {
+          sendJSON(res, 400, {
+            success: false,
+            message: '请输入正整数，不能是负数'
+          });
+          return;
+        }
+        if (guess.includes('.')) {
+          sendJSON(res, 400, {
+            success: false,
+            message: '请输入整数，不支持小数'
+          });
+          return;
+        }
+        if (!/^\d+$/.test(guess)) {
+          sendJSON(res, 400, {
+            success: false,
+            message: '请输入有效的正整数，不能含字母或特殊字符'
+          });
+          return;
+        }
+        guessNum = Number(guess);
+      } else {
         sendJSON(res, 400, {
           success: false,
-          message: '请输入有效的数字'
+          message: '请输入有效的正整数'
+        });
+        return;
+      }
+
+      if (!Number.isFinite(guessNum) || !Number.isSafeInteger(guessNum)) {
+        sendJSON(res, 400, {
+          success: false,
+          message: '数字太大啦，请输入较小的整数'
         });
         return;
       }
@@ -120,7 +188,7 @@ const server = http.createServer(async (req, res) => {
       if (guessNum < gameState.minRange || guessNum > gameState.maxRange) {
         sendJSON(res, 400, {
           success: false,
-          message: `请输入 ${gameState.minRange} 到 ${gameState.maxRange} 之间的数字`
+          message: `请输入 ${gameState.minRange} 到 ${gameState.maxRange} 之间的整数`
         });
         return;
       }
