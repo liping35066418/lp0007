@@ -1,0 +1,11 @@
+{
+  "name": "guess-number-game",
+  "version": "1.0.0",
+  "description": "极简休闲猜数字H5小游戏",
+  "private": true,
+  "scripts": {
+    "start:backend": "node backend/server.js",
+    "start:frontend": "node frontend/server.js",
+    "start": "./start.sh"
+  }
+}

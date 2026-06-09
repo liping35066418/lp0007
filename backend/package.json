@@ -1,0 +1,9 @@
+{
+  "name": "guess-number-backend",
+  "version": "1.0.0",
+  "description": "猜数字游戏后端服务",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "guess-number-frontend",
+  "version": "1.0.0",
+  "description": "猜数字游戏前端H5页面",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

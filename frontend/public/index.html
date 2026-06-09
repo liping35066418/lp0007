@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>猜数字小游戏</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1 class="title">🎯 猜数字</h1>
+      <p class="subtitle">极简休闲小游戏</p>
+    </header>
+
+    <main class="main">
+      <div class="game-info">
+        <div class="info-card">
+          <span class="info-label">数值范围</span>
+          <span class="info-value" id="rangeDisplay">1 - 100</span>
+        </div>
+        <div class="info-card">
+          <span class="info-label">猜测次数</span>
+          <span class="info-value" id="attemptsDisplay">0</span>
+        </div>
+      </div>
+
+      <div class="game-area">
+        <div class="result-display" id="resultDisplay">
+          <span class="result-placeholder">输入数字开始游戏</span>
+        </div>
+
+        <div class="input-area">
+          <input
+            type="number"
+            id="guessInput"
+            class="guess-input"
+            placeholder="请输入你猜的数字"
+            min="1"
+            max="100"
+            autocomplete="off"
+          >
+          <button id="guessBtn" class="btn btn-primary">猜一下</button>
+        </div>
+
+        <div class="history-area">
+          <div class="history-header">
+            <span>猜测记录</span>
+            <button id="resetBtn" class="btn btn-reset">🔄 重新开始</button>
+          </div>
+          <ul class="history-list" id="historyList">
+            <li class="history-empty">暂无记录</li>
+          </ul>
+        </div>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <p>© 2026 猜数字小游戏 | 轻松一刻</p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
